@@ -1,9 +1,9 @@
 ---
-name: build-claude-mod
+name: mod-builder
 description: |
   Designs, builds and verifies a Claude Code mod (a plugin with a function-hooks module: band above
   the prompt, pane, spinner, status line, tool guard, slash command) that looks native in the
-  terminal and the desktop Code tab. Triggers on: "/build-claude-mod", "build a mod", "make a Claude
+  terminal and the desktop Code tab. Triggers on: "/mod-builder", "build a mod", "make a Claude
   Code mod", "mod that shows X above the prompt", "fix how my mod looks". NOT the hooks API itself
   (load the built-in plugin-authoring skill, which this one does), settings hooks, or skills.
 argument-hint: "[what the mod should do]"
