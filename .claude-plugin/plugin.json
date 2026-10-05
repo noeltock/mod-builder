@@ -1,0 +1,16 @@
+{
+  "name": "mod-builder",
+  "description": "A skill that designs, builds and verifies Claude Code mods that look native in the terminal and the desktop app.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Noel Tock"
+  },
+  "homepage": "https://github.com/noeltock/mod-builder",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "mods",
+    "skill",
+    "function-hooks"
+  ]
+}

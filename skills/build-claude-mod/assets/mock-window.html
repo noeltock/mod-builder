@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mod Mock</title>
+<!--
+  Starter for mocking a mod in the Claude desktop Code tab (dark), before writing hooks.
+  Copy it to a scratch folder, serve it (python3 -m http.server 8770), open /mock-window.html.
+
+  Three slots, matching where a mod can draw:
+    #slot-pinned    AbovePrompt, always on: one compact status row
+    #slot-expanded  AbovePrompt, on request: the detail block, growing upward
+    #slot-count     SessionMode: microcopy beside the model/effort controls, never in their place
+  Replace the placeholder content inside each slot. Keep what's outside them: it is the app.
+
+  States: any element with data-in="a b c" shows only in those presets. Presets are buttons in
+  the top bar and bookmarkable hashes (#collapsed, #expanded, …). Add or rename presets in PRESETS.
+  "Slots" outlines the three build areas. The 60px inset and hidden scrollbars keep every preset
+  screenshot-ready.
+-->
+<style>
+/* Sampled from Claude desktop screenshots (Code tab, dark), 2026-10-03. */
+:root{
+  color-scheme:dark;
+  --page:#151515;--outside:#0d0d0d;--panel:#212121;--composer:#20201f;--composer-line:#363635;--line:#2a2a29;
+  --ink:#f0efec;--soft:#c2c1b7;--muted:#898782;--link:#7aa6e7;--bubble:#262626;
+  --ring-track:#2c2c2c;--ring:#4076ce;--code:#e2796f;--code-bg:#262626;--code-line:#353534;
+  /* Mid tones that read on light and dark; for marks inside drawings, never for text */
+  --good:#1d9e75;--warn:#ba7517;--bad:#e24b4a;--track:#888780;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;position:relative;min-height:800px;background:var(--outside);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+a{color:inherit;text-decoration:none}
+svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px}
+
+/* Mock controls, outside the app */
+.proto{position:absolute;top:0;left:0;right:0;height:48px;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid #1d1d1d;font-size:12.5px;color:var(--muted)}
+.proto b{color:var(--soft);font-weight:600;white-space:nowrap}
+.seg{display:flex;gap:2px;background:#171717;border:1px solid #262626;border-radius:8px;padding:2px}
+.seg button{padding:3px 10px;border-radius:6px;color:var(--muted);white-space:nowrap}
+.seg button[aria-pressed=true]{background:#2a2a2a;color:var(--ink)}
+.proto .grow{flex:1}
+
+/* The app window: below the controls it sits 60px in on every side, so that area is the screenshot */
+.app{position:absolute;top:108px;bottom:60px;left:50%;transform:translateX(-50%);width:min(940px,calc(100% - 120px));min-height:600px;border:1px solid #2a2a2a;border-radius:12px;background:var(--page);overflow:hidden;display:grid;grid-template-rows:44px 1fr}
+.titlebar{display:flex;align-items:center;padding:0 14px}
+.lights{display:flex;gap:8px}
+.lights i{width:12px;height:12px;border-radius:50%;background:#3a3a39}
+.main{display:grid;grid-template-rows:1fr auto;min-height:0}
+.scroll{overflow:auto;min-height:0;scrollbar-width:none;-webkit-mask-image:linear-gradient(transparent,#000 28px);mask-image:linear-gradient(transparent,#000 28px)}
+.scroll::-webkit-scrollbar{display:none}
+.col{width:min(720px,calc(100% - 56px));margin:0 auto}
+
+/* Transcript */
+.user{display:flex;justify-content:flex-end;margin:22px 0 18px}
+.user p{margin:0;background:var(--bubble);padding:10px 16px;border-radius:14px;max-width:80%}
+.tool{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13.5px;margin:4px 0}
+.tool .dot{width:6px;height:6px;border-radius:50%;background:#5f8f6e}
+.tool b{color:var(--soft);font-weight:500}
+.answer{margin:14px 0 28px}
+.answer p{margin:0 0 12px}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--code);background:var(--code-bg);border:1px solid var(--code-line);padding:1px 5px;border-radius:5px}
+
+/* The prompt area. .band is the app's own container for AbovePrompt: the mod draws inside it and never paints its own background. */
+.dock{padding:6px 0 10px}
+.band{background:var(--panel);border-radius:16px;padding:14px 26px 16px;margin-bottom:12px}
+.band.pinned{padding:10px 26px}
+.composer{background:var(--composer);border:1px solid var(--composer-line);border-radius:16px;min-height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 18px 0 20px;color:var(--muted);font-size:16px}
+.footer{display:flex;align-items:center;gap:16px;height:40px;padding:0 6px;color:var(--soft)}
+.footer .host{display:flex;align-items:center;gap:14px}
+.footer .grow{flex:1}
+.footer .model,.footer .effort{color:#efeeeb}
+.ctx{width:16px;height:16px;border-radius:50%;background:conic-gradient(var(--ring) 0 22%,var(--ring-track) 22% 100%);-webkit-mask:radial-gradient(circle,transparent 5.2px,#000 5.6px);mask:radial-gradient(circle,transparent 5.2px,#000 5.6px)}
+
+/* Slot outlines (the "Slots" toggle) */
+body.slots [id^=slot-]{outline:1.5px dashed #6b8fd6;outline-offset:4px;position:relative}
+body.slots [id^=slot-]::before{content:attr(data-label);position:absolute;top:-8px;right:16px;padding:0 6px;background:var(--page);line-height:14px;font:11px ui-monospace,Menlo,monospace;color:#8ab0ec;white-space:nowrap}
+body.slots #slot-count::before{top:auto;bottom:-20px;right:0}
+body.slots #slot-count[hidden]{display:flex!important;min-width:110px;min-height:24px}
+body.slots [id^=slot-][hidden]>*{visibility:hidden}
+body.slots .band[hidden]{display:block!important;min-height:40px}
+
+/* ===== Placeholder mod content: replace from here ===== */
+.bh{display:flex;align-items:baseline;gap:10px;margin:0 0 4px}
+.bh b{font-weight:600}
+.bh .n,.asof{color:var(--muted)}
+.bh .grow{flex:1}
+.quiet{color:#c3c2b8;font-size:14px}
+.quiet:hover{color:var(--ink)}
+/* Every row state shares these columns, so loading and loaded rows align */
+.row{display:grid;grid-template-columns:20px minmax(0,1fr) 96px 44px;column-gap:16px;align-items:center;height:30px}
+.row .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:underline;text-decoration-color:#5a5955;text-underline-offset:3px}
+.row .state,.row .age{text-align:right;color:var(--muted);white-space:nowrap}
+.row .ph{color:#4a4945}
+.note{color:var(--muted);height:30px;display:flex;align-items:center;padding-left:36px}
+.mark{width:8px;height:8px;border-radius:50%;display:block;margin-left:4px}
+.stat{display:flex;align-items:baseline;gap:28px}
+.stat span{color:var(--muted)}
+.stat b{font:500 13.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);margin-right:6px}
+.count{display:flex;align-items:center;gap:9px}
+.marks{display:flex;gap:8px;align-items:center}
+.chip{background:var(--panel);color:var(--soft);border-radius:7px;padding:3px 9px;font-size:15px}
+.chip:hover{background:#2a2a29;color:var(--ink)}
+.dim{color:var(--muted)}
+/* ===== to here ===== */
+</style>
+</head>
+<body>
+<div class="proto">
+  <b>Mod mock</b>
+  <div class="seg" id="presets" role="group" aria-label="State"></div>
+  <span class="grow"></span>
+  <div class="seg"><button id="slots" aria-pressed="false">Slots</button></div>
+</div>
+
+<div class="app">
+  <div class="titlebar">
+    <span class="lights"><i></i><i></i><i></i></span>
+  </div>
+
+  <main class="main">
+
+    <div class="scroll"><div class="col">
+      <div class="user"><p>The release checklist still mentions the old staging step. Can you bring it up to date?</p></div>
+      <div class="tool"><span class="dot"></span><b>Read</b> docs/release.md</div>
+      <div class="tool"><span class="dot"></span><b>Search</b> staging in scripts/</div>
+      <div class="tool"><span class="dot"></span><b>Edit</b> docs/release.md</div>
+      <div class="answer">
+        <p>Done. Staging is now promoted by <code>scripts/promote.sh</code>, so the manual step is gone and the checklist points there instead.</p>
+        <p>I also moved the rollback notes under their own heading, since two people asked where they were last week.</p>
+      </div>
+    </div></div>
+
+    <div class="dock"><div class="col">
+
+      <!-- AbovePrompt, pinned: one compact status row, always on -->
+      <section class="band pinned" id="slot-pinned" data-label="AbovePrompt · pinned" data-in="pinned">
+        <div class="stat"><span><b>3</b>open</span><span><b>12</b>this week</span><span><b>2m</b>last build</span><span class="grow"></span></div>
+      </section>
+
+      <!-- AbovePrompt, expanded on request: the detail block -->
+      <section class="band" id="slot-expanded" data-label="AbovePrompt · expanded" data-in="expanded loading offline">
+        <div class="bh"><b>Jobs</b><span class="n" data-in="expanded offline">3</span><span class="grow"></span><span class="asof" data-in="offline">as of 14:02</span><button class="quiet" data-hide>hide</button></div>
+        <div data-in="expanded offline">
+          <div class="row"><i class="mark" style="background:var(--good)"></i><a class="name" href="#">Rebuild the search index</a><span class="state">Running</span><span class="age">4m</span></div>
+          <div class="row"><i class="mark" style="background:var(--warn)"></i><a class="name" href="#">Check broken links in the docs</a><span class="state">Waiting</span><span class="age">22m</span></div>
+          <div class="row"><i class="mark" style="background:var(--track)"></i><a class="name" href="#">Refresh the screenshots</a><span class="state">Queued</span><span class="age">1h</span></div>
+        </div>
+        <div data-in="loading">
+          <div class="row"><i class="mark" style="background:#3a3a39"></i><span class="ph">——————</span><span class="state ph">——</span><span class="age ph">—</span></div>
+          <div class="row"><i class="mark" style="background:#3a3a39"></i><span class="ph">————————</span><span class="state ph">——</span><span class="age ph">—</span></div>
+        </div>
+        <div class="note" data-in="offline">Couldn’t refresh. Trying again each minute.</div>
+      </section>
+
+      <div class="composer"><span>Type / for commands</span><svg class="i" viewBox="0 0 16 16"><path d="M12.5 4v4.5a1 1 0 0 1-1 1H4M6.5 7 4 9.5 6.5 12"/></svg></div>
+      <div class="footer">
+        <span class="host"><svg class="i" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg><svg class="i" viewBox="0 0 16 16"><rect x="6" y="2" width="4" height="8" rx="2"/><path d="M4 7v1a4 4 0 0 0 8 0V7M8 12v2"/></svg><svg class="i" viewBox="0 0 16 16"><path d="m4.5 6.5 3.5 3.5 3.5-3.5"/></svg><span>Auto</span></span>
+        <span class="grow"></span>
+
+        <!-- SessionMode: the count, beside the model/effort controls -->
+        <span class="count" id="slot-count" data-label="SessionMode · count" data-in="collapsed expanded loading offline">
+          <span class="marks"><i class="mark" style="background:var(--good)"></i><i class="mark" style="background:var(--warn)"></i><i class="mark" style="background:var(--track)"></i></span>
+          <button class="chip" data-toggle><span data-in="collapsed expanded">3 jobs</span><span class="dim" data-in="loading">…</span><span class="dim" data-in="offline">3 jobs</span></button>
+        </span>
+
+        <span class="model">Opus 5.5</span><span class="effort">Low</span><span class="ctx" title="Context used"></span>
+      </div>
+    </div></div>
+  </main>
+</div>
+
+<script>
+// Presets: key → button label. A key is also the URL hash, so each state is bookmarkable.
+const PRESETS={hidden:'Hidden',collapsed:'Collapsed',pinned:'Pinned',expanded:'Expanded',loading:'Loading',offline:'Offline'};
+const seg=document.getElementById('presets');
+seg.innerHTML=Object.entries(PRESETS).map(([k,v])=>`<button data-p="${k}">${v}</button>`).join('');
+const stick=()=>{const sc=document.querySelector('.scroll');sc.scrollTop=sc.scrollHeight};
+function show(p){
+  if(!PRESETS[p])p='expanded';
+  document.querySelectorAll('[data-in]').forEach(el=>{el.hidden=!el.dataset.in.split(' ').includes(p)});
+  seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.p===p)));
+  stick();
+}
+seg.onclick=e=>{const b=e.target.closest('button');if(b)location.hash=b.dataset.p};
+addEventListener('hashchange',()=>show(location.hash.slice(1)));
+// The count toggles the expanded block; "hide" collapses it.
+document.addEventListener('click',e=>{
+  if(e.target.closest('[data-toggle]'))location.hash=location.hash==='#collapsed'?'expanded':'collapsed';
+  if(e.target.closest('[data-hide]'))location.hash='collapsed';
+  if(e.target.closest('a[href="#"]'))e.preventDefault();
+});
+document.getElementById('slots').onclick=e=>{const on=document.body.classList.toggle('slots');e.currentTarget.setAttribute('aria-pressed',String(on))};
+new ResizeObserver(stick).observe(document.querySelector('.dock'));
+show(location.hash.slice(1)||'expanded');
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "mod-builder",
+  "owner": {
+    "name": "Noel Tock"
+  },
+  "metadata": {
+    "description": "Make Claude Code mods that look like they shipped with Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "mod-builder",
+      "source": "./",
+      "description": "A skill that designs, builds and verifies Claude Code mods that look native in the terminal and the desktop app.",
+      "version": "1.0.0",
+      "license": "MIT"
+    }
+  ]
+}
